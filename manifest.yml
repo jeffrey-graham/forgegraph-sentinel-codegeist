@@ -1,0 +1,187 @@
+modules:
+  rovo:agent:
+    - key: forgegraph-sentinel-agent
+      name: "ForgeGraph Sentinel"
+      description: >
+        Autonomous Rovo Incident & PR Context Agent powered by Atlassian Teamwork Graph
+        and Model Context Protocol (MCP). Correlates Jira incidents, Bitbucket PR diffs,
+        Compass service dependencies, and Confluence post-mortems to auto-diagnose
+        regressions and draft verified remediation plans.
+      prompt: |
+        You are ForgeGraph Sentinel, an autonomous engineering intelligence agent built on Atlassian Forge.
+        Whenever an engineer opens a Sev-1/Sev-2 Jira issue, views a Compass service component, or inspects
+        a high-risk Bitbucket Pull Request, you:
+        1. Query the Atlassian Teamwork Graph via the `correlate-teamwork-graph` action to traverse upstream
+           and downstream service dependencies, recent deployments, and historical Confluence post-mortems.
+        2. Score every recent Bitbucket PR diff against the incident symptom signature using the
+           `diagnose-pr-regression` action.
+        3. Draft a deterministic, blast-radius-aware remediation plan and Confluence post-mortem stub using
+           `draft-remediation-runbook`, enforcing Marketplace enterprise tenant guardrails.
+      conversationStarters:
+        - "Correlate INC-4092 across Teamwork Graph and identify the root-cause Bitbucket PR"
+        - "Compute blast radius for compass:cloud:svc-payment-checkout and draft a rollback plan"
+        - "Run MCP tool `sentinel_audit_pr_risk` on PR #847 before merging to production"
+        - "Generate a Confluence Post-Mortem with verified timeline and SLA burn-rate metrics"
+      actions:
+        - correlate-teamwork-graph
+        - diagnose-pr-regression
+        - draft-remediation-runbook
+        - execute-mcp-tool
+
+  action:
+    - key: correlate-teamwork-graph
+      name: "Correlate Atlassian Teamwork Graph Context"
+      function: correlateGraphFn
+      actionVerb: GET
+      description: >
+        Traverses the Atlassian Teamwork Graph across Jira issues, Compass components,
+        Bitbucket PR commits, and Confluence runbooks to return a unified context subgraph.
+      inputs:
+        issueKey:
+          title: "Jira Issue Key"
+          type: string
+          required: true
+          description: "The Jira issue key (e.g. INC-4092, PAY-1184, CORE-903)"
+        maxHops:
+          title: "Max Graph Traversal Hops"
+          type: integer
+          required: false
+          description: "Maximum traversal depth in the Teamwork Graph (default: 3)"
+
+    - key: diagnose-pr-regression
+      name: "Diagnose Bitbucket PR Regression & Blast Radius"
+      function: diagnoseRegressionFn
+      actionVerb: GET
+      description: >
+        Scores candidate Bitbucket Pull Requests against incident telemetry, AST risk vectors,
+        and Compass component dependencies to pinpoint the exact offending commit.
+      inputs:
+        issueKey:
+          title: "Jira Issue Key"
+          type: string
+          required: true
+          description: "The Jira issue key under investigation"
+
+    - key: draft-remediation-runbook
+      name: "Draft Verified Rovo Remediation Plan & Confluence Post-Mortem"
+      function: draftRemediationFn
+      actionVerb: CREATE
+      description: >
+        Generates an actionable remediation plan, safe rollback script, and linked Confluence
+        post-mortem page with deterministic SLA impact calculations.
+      inputs:
+        issueKey:
+          title: "Jira Issue Key"
+          type: string
+          required: true
+          description: "The Jira issue key to remediate"
+        executionMode:
+          title: "Execution Mode"
+          type: string
+          required: false
+          description: "ADVISORY or AUTO_STAGE_PR"
+
+    - key: execute-mcp-tool
+      name: "Execute Forge Remote MCP Tool"
+      function: executeMcpToolFn
+      endpoint: sentinel-mcp-remote
+      actionVerb: POST
+      description: >
+        Invokes a Model Context Protocol (MCP) JSON-RPC 2.0 tool exposed by the ForgeGraph Sentinel
+        MCP Server for external IDE agents (Claude Desktop, Cursor, VS Code) and Rovo workflows.
+      inputs:
+        toolName:
+          title: "MCP Tool Name"
+          type: string
+          required: true
+          description: "MCP tool identifier (e.g., teamwork_graph_traverse, diagnose_incident_rca, audit_pr_blast_radius)"
+        argumentsJson:
+          title: "JSON Arguments"
+          type: string
+          required: true
+          description: "Serialized JSON arguments payload for the MCP tool call"
+
+  jira:issuePanel:
+    - key: sentinel-jira-issue-panel
+      resource: main-ui
+      resolver:
+        function: jiraPanelResolver
+      title: "ForgeGraph Sentinel — Rovo & Teamwork Graph RCA"
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+
+  compass:componentPage:
+    - key: sentinel-compass-dependency-radar
+      resource: main-ui
+      resolver:
+        function: compassPageResolver
+      title: "Sentinel Blast-Radius & MCP Telemetry"
+
+  confluence:contentBylineItem:
+    - key: sentinel-postmortem-verifier
+      resource: main-ui
+      resolver:
+        function: confluenceBylineResolver
+      title: "Verified by ForgeGraph Sentinel"
+
+  graph:connector:
+    - key: sentinel-teamwork-graph-ingestor
+      name: "ForgeGraph Sentinel Teamwork Graph Connector"
+      function: ingestTeamworkGraphSignalsFn
+      entityTypes:
+        - atlassian:work-item
+        - atlassian:service-component
+        - atlassian:pull-request
+        - atlassian:document
+
+  function:
+    - key: correlateGraphFn
+      handler: index.correlateGraphHandler
+    - key: diagnoseRegressionFn
+      handler: index.diagnoseRegressionHandler
+    - key: draftRemediationFn
+      handler: index.draftRemediationHandler
+    - key: executeMcpToolFn
+      handler: index.executeMcpToolHandler
+    - key: ingestTeamworkGraphSignalsFn
+      handler: index.ingestTeamworkGraphSignalsHandler
+    - key: jiraPanelResolver
+      handler: index.jiraPanelResolver
+    - key: compassPageResolver
+      handler: index.compassPageResolver
+    - key: confluenceBylineResolver
+      handler: index.confluenceBylineResolver
+
+resources:
+  - key: main-ui
+    path: .
+
+remotes:
+  - key: sentinel-mcp-remote
+    baseUrl: "https://mcp.forgegraph-sentinel.atlassian-dev.net"
+    operations:
+      - compute
+      - fetch
+
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - read:confluence-content.all
+    - write:confluence-content
+    - read:compass:component
+    - write:compass:metric
+    - read:repository:bitbucket
+    - read:pullrequest:bitbucket
+    - storage:app
+  external:
+    fetch:
+      backend:
+        - "https://mcp.forgegraph-sentinel.atlassian-dev.net"
+
+app:
+  runtime:
+    name: nodejs20.x
+  id: ari:cloud:ecosystem::app/f849c210-7b6a-43e9-9d21-6c84a902e51b
+  licensing:
+    enabled: true
