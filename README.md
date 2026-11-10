@@ -73,7 +73,10 @@ python3 scripts/generate_demo_video.py
 
 ---
 
-## 5. Verified Benchmark Results
+## 5. Benchmark Results (Synthetic Incident Corpus — `src/forge_mcp_server.py --demo`)
+
+> [!NOTE]
+> **Execution & Benchmark Scope:** `manifest.yml` defines the Atlassian Forge module wiring (`rovo:agent`, `jira:issuePanel`, `compass:componentPage`, `graph:connector`, and Forge Remote MCP endpoint), `src/forge_mcp_server.py` implements the executable Python Teamwork Graph + MCP JSON-RPC 2.0 correlation engine, and `index.html` provides a zero-credential browser simulator for instant evaluation. The metrics below are produced reproducibly by `python3 src/forge_mcp_server.py --demo` over the included 3-incident synthetic Teamwork Graph benchmark corpus (compared against industry-reference manual triage baselines), rather than live production Atlassian Cloud telemetry.
 
 | Jira Incident | Severity | Primary Compass Service | Pinpointed Root-Cause PR | Confidence | Manual MTTR | Sentinel Autonomous MTTR | MTTR Reduction |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
